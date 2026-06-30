@@ -49,3 +49,4 @@ If `TELEGRAM_WEBHOOK_SECRET` is set, Telegram should send the matching `X-Telegr
 ## Deployment
 
 Vercel project envs are configured through the dashboard/API, and production deploys should target the GitHub `main` branch.
+The project is configured as `nextjs`, so Vercel should run a standard Next.js build instead of expecting a static `public/` output.
