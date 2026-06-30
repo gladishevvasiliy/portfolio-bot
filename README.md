@@ -45,3 +45,7 @@ Set the webhook to:
 `POST https://your-domain/api/telegram/webhook`
 
 If `TELEGRAM_WEBHOOK_SECRET` is set, Telegram should send the matching `X-Telegram-Bot-Api-Secret-Token` header.
+
+## Deployment
+
+Vercel project envs are configured through the dashboard/API, and production deploys should target the GitHub `main` branch.
