@@ -5,7 +5,8 @@ Telegram bot + public portfolio site.
 ## What it does
 
 - You send photos to the bot.
-- The bot asks for `title`, `description`, `size`, and `price`.
+- The bot opens a button menu and then asks for `title`, `description`, `size`, and `price`.
+- Prices are stored and displayed in rubles.
 - The item is saved to Postgres.
 - The public page renders all published items in order.
 
@@ -45,6 +46,8 @@ Set the webhook to:
 `POST https://your-domain/api/telegram/webhook`
 
 If `TELEGRAM_WEBHOOK_SECRET` is set, Telegram should send the matching `X-Telegram-Bot-Api-Secret-Token` header.
+
+Telegram command menu is configured too, so `/start`, `/new`, `/draft`, `/help`, `/cancel`, and `/menu` show up in the bot UI.
 
 ## Deployment
 

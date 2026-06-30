@@ -40,8 +40,8 @@ export type ConversationRecord = {
 export async function createDraftItem() {
   const id = crypto.randomUUID();
   const rows = await sql`
-    insert into portfolio_items (id, status, sort_order)
-    values (${id}, 'draft', extract(epoch from now())::int)
+    insert into portfolio_items (id, status, currency, sort_order)
+    values (${id}, 'draft', 'RUB', extract(epoch from now())::int)
     returning *;
   `;
   return (rows as PortfolioItemRecord[])[0];
@@ -153,7 +153,11 @@ export async function publishItem(itemId: string) {
 }
 
 export function parsePriceToCents(input: string) {
-  const normalized = input.trim().replace(",", ".");
+  const normalized = input
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/₽/g, "")
+    .replace(",", ".");
   const parsed = Number(normalized);
   if (!Number.isFinite(parsed) || parsed < 0) {
     return null;

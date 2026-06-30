@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 function formatPrice(priceCents: number, currency: string) {
   return new Intl.NumberFormat("ru-RU", {
     style: "currency",
-    currency,
+    currency: currency || "RUB",
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(priceCents / 100);
@@ -65,7 +65,7 @@ export default async function HomePage() {
                     </div>
                     <div className="detail">
                       <span className="detail-label">Цена</span>
-                      <span className="detail-value">{formatPrice(item.price_cents, item.currency)}</span>
+                      <span className="detail-value">{formatPrice(item.price_cents, "RUB")}</span>
                     </div>
                     <div className="detail">
                       <span className="detail-label">Фото</span>

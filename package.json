@@ -9,6 +9,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "bootstrap:db": "tsx scripts/bootstrap-db.ts",
+    "migrate:rub-currency": "tsx scripts/migrate-rub-currency.ts",
+    "telegram:set-commands": "tsx scripts/set-telegram-commands.ts",
     "telegram:set-webhook": "tsx scripts/set-telegram-webhook.ts"
   },
   "dependencies": {

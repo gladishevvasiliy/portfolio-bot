@@ -11,7 +11,7 @@ async function main() {
       description text not null default '',
       size text not null default '',
       price_cents integer not null default 0,
-      currency text not null default 'USD',
+      currency text not null default 'RUB',
       status text not null default 'draft' check (status in ('draft', 'published', 'archived')),
       sort_order integer not null default 0,
       created_at timestamptz not null default now(),
