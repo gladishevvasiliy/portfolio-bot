@@ -9,6 +9,7 @@ async function main() {
   const commands: TelegramCommand[] = [
     { command: "start", description: "Открыть меню" },
     { command: "new", description: "Создать новую карточку" },
+    { command: "edit", description: "Редактировать карточку" },
     { command: "draft", description: "Показать текущий черновик" },
     { command: "help", description: "Показать подсказку" },
     { command: "cancel", description: "Отменить текущий черновик" },

@@ -3,6 +3,14 @@ import { sql } from "@/lib/db";
 
 export type PortfolioItemStatus = "draft" | "published" | "archived";
 export type ConversationStep = "awaiting_photos" | "awaiting_title" | "awaiting_description" | "awaiting_size" | "awaiting_price";
+export type EditConversationStep =
+  | "editing_select_field"
+  | "editing_title"
+  | "editing_description"
+  | "editing_size"
+  | "editing_price"
+  | "editing_photos";
+export type AnyConversationStep = ConversationStep | EditConversationStep;
 
 export type PortfolioItemRecord = {
   id: string;
@@ -33,7 +41,7 @@ export type ConversationRecord = {
   chat_id: string;
   admin_id: string;
   item_id: string | null;
-  step: ConversationStep;
+  step: AnyConversationStep;
   updated_at: string;
 };
 
@@ -51,7 +59,7 @@ export async function createOrReplaceConversation(params: {
   chatId: string;
   adminId: string;
   itemId: string;
-  step: ConversationStep;
+  step: AnyConversationStep;
 }) {
   const rows = await sql`
     insert into bot_conversations (chat_id, admin_id, item_id, step)
@@ -105,6 +113,14 @@ export async function getPublishedItems() {
     select * from portfolio_items
     where status = 'published'
     order by coalesce(published_at, created_at) desc, sort_order desc;
+  `) as PortfolioItemRecord[];
+}
+
+export async function getManageableItems() {
+  return (await sql`
+    select * from portfolio_items
+    where status in ('draft', 'published')
+    order by coalesce(published_at, created_at) desc, created_at desc;
   `) as PortfolioItemRecord[];
 }
 

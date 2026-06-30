@@ -47,7 +47,7 @@ Set the webhook to:
 
 If `TELEGRAM_WEBHOOK_SECRET` is set, Telegram should send the matching `X-Telegram-Bot-Api-Secret-Token` header.
 
-Telegram command menu is configured too, so `/start`, `/new`, `/draft`, `/help`, `/cancel`, and `/menu` show up in the bot UI.
+Telegram command menu is configured too, so `/start`, `/new`, `/edit`, `/draft`, `/help`, `/cancel`, and `/menu` show up in the bot UI.
 
 ## Deployment
 

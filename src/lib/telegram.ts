@@ -1,5 +1,16 @@
 import { env } from "@/lib/env";
-import { addImage, clearConversation, createDraftItem, createOrReplaceConversation, getConversation, getItem, parsePriceToCents, publishItem, updateItem } from "@/lib/portfolio";
+import {
+  addImage,
+  clearConversation,
+  createDraftItem,
+  createOrReplaceConversation,
+  getConversation,
+  getItem,
+  getManageableItems,
+  parsePriceToCents,
+  publishItem,
+  updateItem,
+} from "@/lib/portfolio";
 import { storeImage } from "@/lib/storage";
 import { sql } from "@/lib/db";
 
@@ -43,6 +54,7 @@ type InlineKeyboardMarkup = {
 
 const BUTTONS = {
   newItem: "➕ Новая карточка",
+  editItem: "✏️ Редактировать",
   currentDraft: "📋 Текущий черновик",
   help: "ℹ️ Помощь",
   home: "🏠 Меню",
@@ -53,6 +65,7 @@ const BUTTONS = {
 
 const CALLBACKS = {
   newItem: "menu:new",
+  editItem: "menu:edit",
   currentDraft: "menu:draft",
   help: "menu:help",
   home: "menu:home",
@@ -63,10 +76,7 @@ const CALLBACKS = {
 
 function mainMenuMarkup(): ReplyKeyboardMarkup {
   return {
-    keyboard: [
-      [BUTTONS.newItem],
-      [BUTTONS.currentDraft, BUTTONS.help],
-    ],
+    keyboard: [[BUTTONS.newItem], [BUTTONS.editItem], [BUTTONS.currentDraft, BUTTONS.help]],
     resize_keyboard: true,
     is_persistent: true,
     input_field_placeholder: "Выбери действие",
@@ -86,6 +96,15 @@ function draftMarkup(step: string): ReplyKeyboardMarkup {
   };
 }
 
+function editingPhotosMarkup(): ReplyKeyboardMarkup {
+  return {
+    keyboard: [[BUTTONS.done], [BUTTONS.back, BUTTONS.home], [BUTTONS.cancel]],
+    resize_keyboard: true,
+    is_persistent: true,
+    input_field_placeholder: "Добавляй фото",
+  };
+}
+
 function menuMessage(user: TelegramUser) {
   return [
     `Привет, ${displayAdminName(user)}.`,
@@ -98,6 +117,7 @@ function helpMessage() {
   return [
     "Как пользоваться:",
     `• ${BUTTONS.newItem} - создать новую карточку.`,
+    `• ${BUTTONS.editItem} - редактировать существующую карточку.`,
     `• ${BUTTONS.currentDraft} - посмотреть текущий черновик.`,
     `• ${BUTTONS.done} - перейти к следующему шагу после фото.`,
     `• ${BUTTONS.cancel} - отменить текущий черновик.`,
@@ -129,9 +149,7 @@ async function sendMessage(chatId: number, text: string, replyMarkup?: ReplyKeyb
   if (replyMarkup) {
     payload.reply_markup = replyMarkup;
   }
-  await telegramRequest("sendMessage", {
-    ...payload,
-  });
+  await telegramRequest("sendMessage", payload);
 }
 
 async function answerCallbackQuery(callbackQueryId: string, text: string) {
@@ -190,15 +208,56 @@ async function openNewDraft(chatId: number, from: TelegramUser, previousConversa
   );
 }
 
+function itemStatusLabel(status: string) {
+  if (status === "published") return "опубликована";
+  if (status === "draft") return "черновик";
+  return status;
+}
+
+function trimInlineText(value: string, maxLength = 34) {
+  return value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value;
+}
+
+function editItemKeyboard(items: Awaited<ReturnType<typeof getManageableItems>>) {
+  const rows: Array<Array<{ text: string; callback_data: string }>> = [];
+  for (const item of items) {
+    const label = trimInlineText(item.title || `Карточка ${item.id.slice(0, 8)}`);
+    rows.push([
+      {
+        text: `${label} · ${itemStatusLabel(item.status)}`,
+        callback_data: `edit:item:${item.id}`,
+      },
+    ]);
+  }
+  return { inline_keyboard: rows };
+}
+
+function editFieldKeyboard(itemId: string) {
+  return {
+    inline_keyboard: [
+      [
+        { text: "Название", callback_data: `edit:field:${itemId}:title` },
+        { text: "Описание", callback_data: `edit:field:${itemId}:description` },
+      ],
+      [
+        { text: "Размер", callback_data: `edit:field:${itemId}:size` },
+        { text: "Цена", callback_data: `edit:field:${itemId}:price` },
+      ],
+      [{ text: "Фото", callback_data: `edit:field:${itemId}:photos` }],
+      [{ text: "Меню", callback_data: CALLBACKS.home }],
+    ],
+  };
+}
+
 async function showCurrentDraft(chatId: number, from: TelegramUser, conversation: Awaited<ReturnType<typeof getConversation>> | null) {
   if (!conversation?.item_id) {
-    await sendMessage(chatId, "Черновика сейчас нет.", mainMenuMarkup());
+    await sendMessage(chatId, "Текущей карточки нет.", mainMenuMarkup());
     return;
   }
 
   const item = await getItem(conversation.item_id);
   if (!item) {
-    await sendMessage(chatId, "Черновик не найден. Можно создать новый.", mainMenuMarkup());
+    await sendMessage(chatId, "Карточка не найдена. Можно создать новую.", mainMenuMarkup());
     return;
   }
 
@@ -207,17 +266,68 @@ async function showCurrentDraft(chatId: number, from: TelegramUser, conversation
     conversation.step === "awaiting_title" ? "жду название" :
     conversation.step === "awaiting_description" ? "жду описание" :
     conversation.step === "awaiting_size" ? "жду размер" :
-    "жду цену";
+    conversation.step === "awaiting_price" ? "жду цену" :
+    conversation.step === "editing_select_field" ? "редактирование карточки" :
+    conversation.step === "editing_title" ? "редактирую название" :
+    conversation.step === "editing_description" ? "редактирую описание" :
+    conversation.step === "editing_size" ? "редактирую размер" :
+    conversation.step === "editing_price" ? "редактирую цену" :
+    "редактирую фото";
 
   await sendMessage(
     chatId,
     [
-      `Текущий черновик для ${displayAdminName(from)}.`,
+      `Текущая карточка для ${displayAdminName(from)}.`,
       `Статус: <b>${statusLabel}</b>.`,
-      "Можно продолжать с этого места или создать новый черновик.",
+      "Можно продолжить с этого места или открыть новое меню.",
     ].join("\n"),
-    draftMarkup(conversation.step),
+    conversation.step.startsWith("editing_") ? editFieldKeyboard(item.id) : draftMarkup(conversation.step),
   );
+}
+
+async function showEditItemList(chatId: number) {
+  const items = await getManageableItems();
+  if (items.length === 0) {
+    await sendMessage(chatId, "Пока нет карточек для редактирования.", mainMenuMarkup());
+    return;
+  }
+
+  await sendMessage(chatId, "Выбери карточку, которую хочешь изменить:", editItemKeyboard(items));
+}
+
+async function startEditingItem(chatId: number, from: TelegramUser, itemId: string, previousConversation: Awaited<ReturnType<typeof getConversation>> | null) {
+  await archiveCurrentDraft(previousConversation);
+  const item = await getItem(itemId);
+  if (!item) {
+    await sendMessage(chatId, "Карточка не найдена.", mainMenuMarkup());
+    return;
+  }
+
+  await createOrReplaceConversation({
+    chatId: String(chatId),
+    adminId: String(from.id),
+    itemId: item.id,
+    step: "editing_select_field",
+  });
+
+  await sendMessage(
+    chatId,
+    [
+      `Редактируем: <b>${item.title || "без названия"}</b>.`,
+      "Выбери поле, которое нужно изменить.",
+    ].join("\n"),
+    editFieldKeyboard(item.id),
+  );
+}
+
+async function returnToEditFields(chatId: number, from: TelegramUser, itemId: string) {
+  await createOrReplaceConversation({
+    chatId: String(chatId),
+    adminId: String(from.id),
+    itemId,
+    step: "editing_select_field",
+  });
+  await sendMessage(chatId, "Что меняем дальше?", editFieldKeyboard(itemId));
 }
 
 async function cancelCurrentDraft(chatId: number, conversation: Awaited<ReturnType<typeof getConversation>> | null) {
@@ -242,12 +352,17 @@ async function handleText(message: TelegramMessage, text: string) {
     return;
   }
 
+  if (text === BUTTONS.editItem || text === "/edit") {
+    await showEditItemList(chatId);
+    return;
+  }
+
   if (text === BUTTONS.currentDraft) {
     await showCurrentDraft(chatId, from, conversation);
     return;
   }
 
-  if (text === BUTTONS.help) {
+  if (text === BUTTONS.help || text === "/help") {
     await sendMessage(chatId, helpMessage(), mainMenuMarkup());
     return;
   }
@@ -267,6 +382,10 @@ async function handleText(message: TelegramMessage, text: string) {
   if (text === BUTTONS.back) {
     if (!conversation.item_id) {
       await sendMainMenu(chatId, from);
+      return;
+    }
+    if (conversation.step.startsWith("editing_")) {
+      await returnToEditFields(chatId, from, conversation.item_id);
       return;
     }
     await createOrReplaceConversation({
@@ -354,6 +473,34 @@ async function handleText(message: TelegramMessage, text: string) {
       await sendMessage(chatId, "Карточка опубликована.", mainMenuMarkup());
       return;
     }
+    case "editing_select_field":
+      await sendMessage(chatId, "Выбери поле для редактирования кнопкой ниже.", editFieldKeyboard(item.id));
+      return;
+    case "editing_title":
+      await updateItem(item.id, { title: text });
+      await returnToEditFields(chatId, from, item.id);
+      return;
+    case "editing_description":
+      await updateItem(item.id, { description: text });
+      await returnToEditFields(chatId, from, item.id);
+      return;
+    case "editing_size":
+      await updateItem(item.id, { size: text });
+      await returnToEditFields(chatId, from, item.id);
+      return;
+    case "editing_price": {
+      const cents = parsePriceToCents(text);
+      if (cents === null) {
+        await sendMessage(chatId, "Не смог распознать цену. Пришли сумму в рублях, например 12500 или 12 500 ₽.", editFieldKeyboard(item.id));
+        return;
+      }
+      await updateItem(item.id, { price_cents: cents });
+      await returnToEditFields(chatId, from, item.id);
+      return;
+    }
+    case "editing_photos":
+      await sendMessage(chatId, `Отправляй фото или нажми <b>${BUTTONS.done}</b>, когда закончишь.`, editingPhotosMarkup());
+      return;
   }
 }
 
@@ -363,11 +510,25 @@ async function handlePhoto(message: TelegramMessage) {
   const photo = message.photo?.at(-1);
   if (!from || !photo) return;
   const conversation = await getConversation(String(chatId));
-  if (!conversation) {
+  if (!conversation || !conversation.item_id) {
     await sendMainMenu(chatId, from);
     return;
   }
-  if (conversation.step !== "awaiting_photos" || !conversation.item_id) {
+
+  if (conversation.step === "editing_photos") {
+    const bytes = await getTelegramFile(photo.file_id);
+    const stored = await storeImage(bytes, `${photo.file_id}.jpg`);
+    await addImage({
+      itemId: conversation.item_id,
+      blobUrl: stored.url,
+      source: stored.kind,
+      telegramFileId: photo.file_id,
+    });
+    await sendMessage(chatId, "Фото добавлено к карточке.", editingPhotosMarkup());
+    return;
+  }
+
+  if (conversation.step !== "awaiting_photos") {
     await sendMessage(chatId, "Сейчас фото не ожидаются.", draftMarkup(conversation.step));
     return;
   }
@@ -393,8 +554,9 @@ async function handleCallbackQuery(callbackQuery: TelegramCallbackQuery) {
   }
 
   const conversation = await getConversation(String(chatId));
+  const data = callbackQuery.data ?? "";
 
-  switch (callbackQuery.data) {
+  switch (data) {
     case CALLBACKS.home:
       await answerCallbackQuery(callbackQuery.id, "Главное меню");
       await sendMainMenu(chatId, from);
@@ -407,16 +569,28 @@ async function handleCallbackQuery(callbackQuery: TelegramCallbackQuery) {
       await answerCallbackQuery(callbackQuery.id, "Создаю черновик");
       await openNewDraft(chatId, from, conversation);
       return;
+    case CALLBACKS.editItem:
+      await answerCallbackQuery(callbackQuery.id, "Редактирование");
+      await showEditItemList(chatId);
+      return;
     case CALLBACKS.currentDraft:
-      await answerCallbackQuery(callbackQuery.id, "Черновик");
+      await answerCallbackQuery(callbackQuery.id, "Карточка");
       await showCurrentDraft(chatId, from, conversation);
       return;
     case CALLBACKS.cancel:
-      await answerCallbackQuery(callbackQuery.id, "Черновик отменён");
+      await answerCallbackQuery(callbackQuery.id, "Отменено");
       await cancelCurrentDraft(chatId, conversation);
       return;
     case CALLBACKS.done:
       await answerCallbackQuery(callbackQuery.id, "Готово");
+      if (conversation?.step === "editing_photos") {
+        if (!conversation.item_id) {
+          await sendMainMenu(chatId, from);
+          return;
+        }
+        await returnToEditFields(chatId, from, conversation.item_id);
+        return;
+      }
       if (!conversation) {
         await sendMainMenu(chatId, from);
         return;
@@ -436,6 +610,10 @@ async function handleCallbackQuery(callbackQuery: TelegramCallbackQuery) {
         await sendMainMenu(chatId, from);
         return;
       }
+      if (conversation.step.startsWith("editing_")) {
+        await showEditItemList(chatId);
+        return;
+      }
       await createOrReplaceConversation({
         chatId: String(chatId),
         adminId: String(from.id),
@@ -444,9 +622,82 @@ async function handleCallbackQuery(callbackQuery: TelegramCallbackQuery) {
       });
       await sendMessage(chatId, "Вернулись к фото.", draftMarkup("awaiting_photos"));
       return;
-    default:
-      await answerCallbackQuery(callbackQuery.id, "Готово");
   }
+
+  if (data.startsWith("edit:item:")) {
+    const itemId = data.slice("edit:item:".length);
+    await answerCallbackQuery(callbackQuery.id, "Карточка выбрана");
+    await startEditingItem(chatId, from, itemId, conversation);
+    return;
+  }
+
+  if (data.startsWith("edit:field:")) {
+    const parts = data.split(":");
+    const itemId = parts[2];
+    const field = parts[3];
+    await answerCallbackQuery(callbackQuery.id, "Поле выбрано");
+    if (!itemId || !field) {
+      await sendMainMenu(chatId, from);
+      return;
+    }
+
+    if (field === "title") {
+      await createOrReplaceConversation({
+        chatId: String(chatId),
+        adminId: String(from.id),
+        itemId,
+        step: "editing_title",
+      });
+      await sendMessage(chatId, "Пришли новое название.", editFieldKeyboard(itemId));
+      return;
+    }
+
+    if (field === "description") {
+      await createOrReplaceConversation({
+        chatId: String(chatId),
+        adminId: String(from.id),
+        itemId,
+        step: "editing_description",
+      });
+      await sendMessage(chatId, "Пришли новое описание.", editFieldKeyboard(itemId));
+      return;
+    }
+
+    if (field === "size") {
+      await createOrReplaceConversation({
+        chatId: String(chatId),
+        adminId: String(from.id),
+        itemId,
+        step: "editing_size",
+      });
+      await sendMessage(chatId, "Пришли новый размер.", editFieldKeyboard(itemId));
+      return;
+    }
+
+    if (field === "price") {
+      await createOrReplaceConversation({
+        chatId: String(chatId),
+        adminId: String(from.id),
+        itemId,
+        step: "editing_price",
+      });
+      await sendMessage(chatId, "Пришли новую цену в рублях.", editFieldKeyboard(itemId));
+      return;
+    }
+
+    if (field === "photos") {
+      await createOrReplaceConversation({
+        chatId: String(chatId),
+        adminId: String(from.id),
+        itemId,
+        step: "editing_photos",
+      });
+      await sendMessage(chatId, "Отправляй дополнительные фото.", editingPhotosMarkup());
+      return;
+    }
+  }
+
+  await answerCallbackQuery(callbackQuery.id, "Готово");
 }
 
 export async function handleTelegramUpdate(update: TelegramUpdate) {
