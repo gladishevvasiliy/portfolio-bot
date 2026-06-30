@@ -23,20 +23,6 @@ export default async function HomePage() {
 
   return (
     <main>
-      <section className="hero">
-        <p className="eyebrow">Portfolio bot</p>
-        <h1>Портфолио, которое наполняется из Telegram</h1>
-        <p className="lede">
-          Загружаешь фото в бот, отвечаешь на несколько вопросов, и карточка сразу появляется на сайте.
-          Это удобно как для тебя, так и для клиента, который просто листает готовые работы.
-        </p>
-        <div className="meta-row">
-          <span className="pill">Telegram admin flow</span>
-          <span className="pill">Neon Postgres</span>
-          <span className="pill">Vercel deploy</span>
-        </div>
-      </section>
-
       <section className="grid" aria-label="Portfolio items">
         {items.length === 0 ? (
           <div className="empty">
