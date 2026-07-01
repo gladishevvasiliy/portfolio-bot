@@ -25,7 +25,7 @@ export default async function HomePage() {
     <main>
       <section className="hero" aria-labelledby="order-info-title">
         <p className="eyebrow">Условия заказа</p>
-        <h1 id="order-info-title">Иконы пишутся под заказ и в любом нужном размере</h1>
+        <h1 id="order-info-title">Каталог</h1>
         <p className="lede">
           Все представленные в каталоге иконы можно написать в любом другом размере.
           Доставка в любую точку России за счёт покупателя.
