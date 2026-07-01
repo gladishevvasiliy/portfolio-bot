@@ -95,6 +95,42 @@ h1 {
   color: var(--muted);
 }
 
+.order-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.order-list li {
+  position: relative;
+  padding-left: 18px;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.order-list li::before {
+  content: "";
+  position: absolute;
+  top: 0.72em;
+  left: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.order-note {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(28, 87, 79, 0.16);
+  background: rgba(28, 87, 79, 0.08);
+  color: var(--text);
+  line-height: 1.55;
+}
+
 .grid {
   display: grid;
   gap: 22px;
@@ -181,11 +217,19 @@ h1 {
 }
 
 @media (max-width: 860px) {
+  .hero {
+    padding: 22px;
+  }
+
   .item {
     grid-template-columns: 1fr;
   }
 
   .details {
     grid-template-columns: 1fr;
+  }
+
+  .meta-row {
+    gap: 8px;
   }
 }

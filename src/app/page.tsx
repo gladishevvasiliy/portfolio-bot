@@ -23,6 +23,31 @@ export default async function HomePage() {
 
   return (
     <main>
+      <section className="hero" aria-labelledby="order-info-title">
+        <p className="eyebrow">Условия заказа</p>
+        <h1 id="order-info-title">Иконы пишутся под заказ и в любом нужном размере</h1>
+        <p className="lede">
+          Все представленные в каталоге иконы можно написать в любом другом размере.
+          Доставка в любую точку России за счёт покупателя.
+          Тщательно упакую, чтобы до Вас всё доехало в целости и сохранности.
+        </p>
+        <div className="meta-row" aria-label="Короткие условия заказа">
+          <span className="pill">СДЭК</span>
+          <span className="pill">Boxberry</span>
+          <span className="pill">Яндекс</span>
+          <span className="pill">Почта России</span>
+          <span className="pill">Предоплата 50%</span>
+        </div>
+        <ul className="order-list">
+          <li>Отправлю СДЭК, Boxberry, Яндекс и Почтой России.</li>
+          <li>Для заказа просто напишите мне.</li>
+          <li>Заказы принимаю я сама, без помощников и менеджеров.</li>
+          <li>Перед началом работ беру предоплату 50% на материалы и в знак подтверждения намерения.</li>
+        </ul>
+        <p className="order-note">
+          Сразу после внесения предоплаты приступаю к работе.
+        </p>
+      </section>
       <section className="grid" aria-label="Portfolio items">
         {items.length === 0 ? (
           <div className="empty">
